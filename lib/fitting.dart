@@ -43,3 +43,78 @@ FitResult fitABC(List<double> t, List<double> y) {
 print("a=$a, b=$b, c=$c");
   return FitResult(a, b, c);
 }
+
+// -------------------------------------------------------------
+// Log-likelihood: Gaussian error model
+// -------------------------------------------------------------
+double logLikelihood(
+    List<double> ts, List<double> ys, double a, double b, double c) {
+  double sum = 0;
+  for (int i = 0; i < ts.length; i++) {
+    final pred = model(ts[i], a, b, c);
+    final err = ys[i] - pred;
+    sum += -0.5 * err * err; // sigma^2 = 1 (we don't need to know sigma)
+  }
+  return sum;
+}
+
+// -------------------------------------------------------------
+// Simple Metropolis-Hastings MCMC
+// -------------------------------------------------------------
+List<FitResult> runMCMC(
+  List<double> ts,
+  List<double> ys, {
+  required double a0,
+  required double b0,
+  required double c0,
+  int steps = 5000,
+  double stepA = 0.05,
+  double stepB = 0.05,
+  double stepC = 0.05,
+}) {
+  final rand = math.Random();
+
+  double a = a0;
+  double b = b0;
+  double c = c0;
+
+  double currentLL = logLikelihood(ts, ys, a, b, c);
+
+  List<FitResult> samples = [];
+
+  for (int i = 0; i < steps; i++) {
+    // propose new parameters
+    final aProp = a + rand.nextGaussian() * stepA;
+    final bProp = b + rand.nextGaussian() * stepB;
+    final cProp = c + rand.nextGaussian() * stepC;
+
+    // reject nonsense
+    if (cProp == 0 || cProp.isNaN || aProp.isNaN) continue;
+
+    final llProp = logLikelihood(ts, ys, aProp, bProp, cProp);
+
+    final acceptProb = math.exp(llProp - currentLL);
+
+    if (rand.nextDouble() < acceptProb) {
+      a = aProp;
+      b = bProp;
+      c = cProp;
+      currentLL = llProp;
+    }
+
+    samples.add(FitResult(a, b, c));
+  }
+
+  return samples;
+}
+
+// -------------------------------------------------------------
+// Bonus: Gaussian random utility
+// -------------------------------------------------------------
+extension RandGaussian on math.Random {
+  double nextGaussian() {
+    double u1 = nextDouble();
+    double u2 = nextDouble();
+    return math.sqrt(-2 * math.log(u1)) * math.cos(2 * math.pi * u2);
+  }
+}

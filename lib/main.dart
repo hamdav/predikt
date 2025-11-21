@@ -136,6 +136,32 @@ class _PlotScreenState extends State<PlotScreen> {
   List<FlSpot> buildFittedCurve() {
     if (points.length < 2) return [];
 
+    final xs = tsNormalized;  // from your normalized timestamps
+    final ys = values;
+
+    // Use your previous fit as initial values:
+    final initialFit = fitABC(xs, ys);
+
+    // Run the MCMC
+    final samples = runMCMC(
+      xs,
+      ys,
+      a0: initialFit.a,
+      b0: initialFit.b,
+      c0: initialFit.c,
+      steps: 5000,
+    );
+
+    // Compute means
+    final meanA = samples.map((s) => s.a).reduce((a,b)=>a+b) / samples.length;
+    final meanB = samples.map((s) => s.b).reduce((a,b)=>a+b) / samples.length;
+    final meanC = samples.map((s) => s.c).reduce((a,b)=>a+b) / samples.length;
+
+    print("Posterior means:");
+    print("a = $meanA");
+    print("b = $meanB");
+    print("c = $meanC");
+
     // Convert to seconds
     final xsSec = points
         .map((p) => p.timestamp.millisecondsSinceEpoch / 1000.0)
