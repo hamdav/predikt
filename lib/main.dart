@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'dart:math' as math;
 import 'package:hive_flutter/hive_flutter.dart';
+
 import 'data_point.dart';
 import 'fitting.dart';
 
@@ -10,7 +11,6 @@ void main() async {
 
   await Hive.initFlutter();
   Hive.registerAdapter(DataPointAdapter());
-
   await Hive.openBox<DataPoint>('pointsBox');
 
   runApp(const NumberPlotApp());
@@ -30,9 +30,6 @@ class NumberPlotApp extends StatelessWidget {
   }
 }
 
-// ------------------------------------------------------
-// START SCREEN
-// ------------------------------------------------------
 class StartScreen extends StatelessWidget {
   const StartScreen({super.key});
 
@@ -55,12 +52,8 @@ class StartScreen extends StatelessWidget {
   }
 }
 
-// ------------------------------------------------------
-// PLOT SCREEN
-// ------------------------------------------------------
 class PlotScreen extends StatefulWidget {
   const PlotScreen({super.key});
-
   @override
   State<PlotScreen> createState() => _PlotScreenState();
 }
@@ -71,107 +64,43 @@ class _PlotScreenState extends State<PlotScreen> {
 
   List<DataPoint> get points => pointsBox.values.toList();
 
-    @override
-    void initState() {
-        super.initState();              // Always call super.initState() first
-        pointsBox = Hive.box<DataPoint>('pointsBox'); // Initialize your Hive box
-    }
+  @override
+  void initState() {
+    super.initState();
+    pointsBox = Hive.box<DataPoint>('pointsBox');
+  }
 
-  // ------------------------------------------------------
-  // Add NOW
-  // ------------------------------------------------------
-    void _addValueNow() {
-      final text = _controller.text.trim();
-      if (text.isEmpty) return;
+  // Add now
+  void _addValueNow() {
+    final text = _controller.text.trim();
+    if (text.isEmpty) return;
 
-      final number = double.tryParse(text);
-      if (number == null) return;
+    final number = double.tryParse(text);
+    if (number == null) return;
 
-      pointsBox.add(
-        DataPoint(value: number, timestamp: DateTime.now()),
-      );
+    pointsBox.add(DataPoint(value: number, timestamp: DateTime.now()));
 
-      _controller.clear();
-      setState(() {});
-    }
+    _controller.clear();
+    setState(() {});
+  }
 
-  // ------------------------------------------------------
   // Add with datetime picker
-  // ------------------------------------------------------
-    void _addValueWithPicker() async {
-      final picked = await pickDateTime(context);
-      if (picked == null) return;
+  void _addValueWithPicker() async {
+    final picked = await pickDateTime(context);
+    if (picked == null) return;
 
-      final text = _controller.text.trim();
-      if (text.isEmpty) return;
+    final text = _controller.text.trim();
+    if (text.isEmpty) return;
 
-      final number = double.tryParse(text);
-      if (number == null) return;
+    final number = double.tryParse(text);
+    if (number == null) return;
 
-      pointsBox.add(
-        DataPoint(value: number, timestamp: picked),
-      );
+    pointsBox.add(DataPoint(value: number, timestamp: picked));
 
-      _controller.clear();
-      setState(() {});
-    }
+    _controller.clear();
+    setState(() {});
+  }
 
-    void editPointDialog(DataPoint point, int index) {
-      final valueController =
-          TextEditingController(text: point.value.toString());
-
-      showDialog(
-        context: context,
-        builder: (_) {
-          return AlertDialog(
-            title: const Text("Edit Point"),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: valueController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: "Value"),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  child: const Text("Change Timestamp"),
-                  onPressed: () async {
-                    final picked = await pickDateTime(context);
-                    if (picked != null) {
-                      point.timestamp = picked;
-                      await point.save();
-                      setState(() {});
-                    }
-                  },
-                )
-              ],
-            ),
-            actions: [
-              TextButton(
-                child: const Text("Cancel"),
-                onPressed: () => Navigator.pop(context),
-              ),
-              TextButton(
-                child: const Text("Save"),
-                onPressed: () async {
-                  final newVal = double.tryParse(valueController.text);
-                  if (newVal != null) {
-                    point.value = newVal;
-                    await point.save();
-                    setState(() {});
-                  }
-                  Navigator.pop(context);
-                },
-              ),
-            ],
-          );
-        },
-      );
-    }
-  // ------------------------------------------------------
-  // Datetime Picker Helper
-  // ------------------------------------------------------
   Future<DateTime?> pickDateTime(BuildContext context) async {
     final date = await showDatePicker(
       context: context,
@@ -179,34 +108,23 @@ class _PlotScreenState extends State<PlotScreen> {
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
     );
-
     if (date == null) return null;
 
     final time = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.now(),
     );
-
     if (time == null) return null;
 
-    return DateTime(
-      date.year,
-      date.month,
-      date.day,
-      time.hour,
-      time.minute,
-    );
+    return DateTime(date.year, date.month, date.day, time.hour, time.minute);
   }
 
-  // ------------------------------------------------------
-  // Convert points → FlSpots
-  // ------------------------------------------------------
   List<FlSpot> get valueSpots {
     if (points.isEmpty) return [];
 
     final spots = points.map((p) {
       return FlSpot(
-        p.timestamp.millisecondsSinceEpoch.toDouble(),
+        p.timestamp.millisecondsSinceEpoch / 1000.0, // seconds
         p.value,
       );
     }).toList();
@@ -215,49 +133,44 @@ class _PlotScreenState extends State<PlotScreen> {
     return spots;
   }
 
-  // ------------------------------------------------------
-  // Compute TRENDLINE using linear regression on timestamps
-  // ------------------------------------------------------
   List<FlSpot> buildFittedCurve() {
-  if (points.length < 2) return [];
+    if (points.length < 2) return [];
 
-  // convert to seconds
-  final xsAbs = points
-      .map((p) => p.timestamp.millisecondsSinceEpoch / 1000.0)
-      .toList();
-  final ys = points.map((p) => p.value).toList();
+    // Convert to seconds
+    final xsSec = points
+        .map((p) => p.timestamp.millisecondsSinceEpoch / 1000.0)
+        .toList();
+    final ys = points.map((p) => p.value).toList();
 
-  // fit using absolute time (b fits correctly)
-  final fit = fitABC(xsAbs, ys);
-  final a = fit.a;
-  final b = fit.b;
-  final c = fit.c;
+    // Normalize time (important)
+    final t0 = xsSec.first;
+    final ts = xsSec.map((t) => t - t0).toList();
 
-  final minX = xsAbs.reduce(math.min);
-  final maxX = xsAbs.reduce(math.max);
+    final fit = fitABC(ts, ys);
+    final a = fit.a, b = fit.b, c = fit.c;
 
-  const samples = 200;
-  List<FlSpot> spots = [];
+    final minT = ts.reduce(math.min);
+    final maxT = ts.reduce(math.max);
 
-  for (int i = 0; i < samples; i++) {
-    double t = minX + (maxX - minX) * i / (samples - 1);
-    double y = model(t, a, b, c);
-    spots.add(FlSpot(t, y));
+    const samples = 200;
+    List<FlSpot> spots = [];
+
+    for (int i = 0; i < samples; i++) {
+      double tRel = minT + (maxT - minT) * i / (samples - 1);
+      double y = model(tRel, a, b, c);
+      double tAbs = tRel + t0; // un-normalize
+      spots.add(FlSpot(tAbs, y));
+    }
+
+    return spots;
   }
 
-  return spots;
-}
-  // ------------------------------------------------------
-  // Formatter for datetime axis labels
-  // ------------------------------------------------------
-  String formatTimestamp(double ms) {
-    final dt = DateTime.fromMillisecondsSinceEpoch(ms.toInt());
+  String formatTimestamp(double seconds) {
+    final ms = (seconds * 1000).toInt();
+    final dt = DateTime.fromMillisecondsSinceEpoch(ms);
     return "${dt.hour}:${dt.minute.toString().padLeft(2, '0')}\n${dt.month}/${dt.day}";
   }
 
-  // ------------------------------------------------------
-  // Build CHART widget
-  // ------------------------------------------------------
   Widget buildChart() {
     if (points.isEmpty) {
       return const Center(child: Text("Chart will appear here"));
@@ -269,26 +182,21 @@ class _PlotScreenState extends State<PlotScreen> {
         maxX: valueSpots.last.x,
         minY: points.map((p) => p.value).reduce(math.min) - 1,
         maxY: points.map((p) => p.value).reduce(math.max) + 1,
-
         gridData: const FlGridData(show: true),
 
         titlesData: FlTitlesData(
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              interval: (valueSpots.last.x - valueSpots.first.x) == 0
-                ? 1  // fallback interval
-                : (valueSpots.last.x - valueSpots.first.x) / 4,
-              getTitlesWidget: (value, meta) {
-                return Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Text(
-                    formatTimestamp(value),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 10),
-                  ),
-                );
-              },
+              interval: (valueSpots.last.x - valueSpots.first.x) / 4,
+              getTitlesWidget: (v, meta) => Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  formatTimestamp(v),
+                  style: const TextStyle(fontSize: 10),
+                  textAlign: TextAlign.center,
+                ),
+              ),
             ),
           ),
           leftTitles: AxisTitles(
@@ -311,7 +219,6 @@ class _PlotScreenState extends State<PlotScreen> {
         ),
 
         lineBarsData: [
-          // USER DATA
           LineChartBarData(
             spots: valueSpots,
             isCurved: false,
@@ -319,22 +226,18 @@ class _PlotScreenState extends State<PlotScreen> {
             barWidth: 3,
             dotData: const FlDotData(show: true),
           ),
-          // TRENDLINE
-            LineChartBarData(
-              spots: buildFittedCurve(),
-              isCurved: true,
-              color: Colors.red,
-              barWidth: 2,
-              dotData: const FlDotData(show: false),
-            ),
+          LineChartBarData(
+            spots: buildFittedCurve(),
+            isCurved: true,
+            color: Colors.red,
+            barWidth: 2,
+            dotData: const FlDotData(show: false),
+          ),
         ],
       ),
     );
   }
 
-  // ------------------------------------------------------
-  // UI
-  // ------------------------------------------------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -343,14 +246,12 @@ class _PlotScreenState extends State<PlotScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // INPUT AREA
             Row(
               children: [
                 Expanded(
                   child: TextField(
                     controller: _controller,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     decoration: const InputDecoration(
                       labelText: "Enter a number",
                       border: OutlineInputBorder(),
@@ -358,9 +259,6 @@ class _PlotScreenState extends State<PlotScreen> {
                   ),
                 ),
                 const SizedBox(width: 10),
-
-                // TAP = add now
-                // LONG PRESS = pick datetime
                 GestureDetector(
                   onTap: _addValueNow,
                   onLongPress: _addValueWithPicker,
@@ -371,10 +269,7 @@ class _PlotScreenState extends State<PlotScreen> {
                 ),
               ],
             ),
-
             const SizedBox(height: 20),
-
-            // CHART
             Expanded(
               child: Container(
                 padding: const EdgeInsets.all(12),
@@ -385,6 +280,8 @@ class _PlotScreenState extends State<PlotScreen> {
                 child: buildChart(),
               ),
             ),
+
+            // List of points
             Expanded(
               child: ListView.builder(
                 itemCount: pointsBox.length,
@@ -401,10 +298,6 @@ class _PlotScreenState extends State<PlotScreen> {
                     child: ListTile(
                       title: Text("${point.value}"),
                       subtitle: Text(point.timestamp.toString()),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.edit),
-                        onPressed: () => editPointDialog(point, index),
-                      ),
                     ),
                   );
                 },
@@ -416,4 +309,3 @@ class _PlotScreenState extends State<PlotScreen> {
     );
   }
 }
-
