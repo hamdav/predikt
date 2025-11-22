@@ -97,6 +97,7 @@ List<FitResult> runMCMC(
   required double c0,
   required double d0,
   int steps = 5000,
+  int thin = 5,
   double stepA = 0.01,
   double stepB = 0.01,
   double stepC = 0.01,
@@ -158,7 +159,12 @@ List<FitResult> runMCMC(
   // Remove burn in, and thin (TODO)
   samples.removeRange(0,2000);
 
-  return samples;
+  final List<FitResult> thin_samples = [];
+  for (int i=0; i < samples.length; i+=thin) {
+    thin_samples.add(samples[i]);
+  }
+
+  return thin_samples;
 }
 
 // -------------------------------------------------------------
