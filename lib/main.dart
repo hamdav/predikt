@@ -20,14 +20,14 @@ class NumberPlotApp extends StatelessWidget {
   const NumberPlotApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Datetime Plot App',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(useMaterial3: true),
-      home: const StartScreen(),
-    );
-  }
+    Widget build(BuildContext context) {
+      return MaterialApp(
+          title: 'Datetime Plot App',
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData(useMaterial3: true),
+          home: const StartScreen(),
+          );
+    }
 }
 
 class StartScreen extends StatelessWidget {
@@ -59,9 +59,9 @@ class PlotScreen extends StatefulWidget {
 }
 
 class _PlotScreenState extends State<PlotScreen> {
+
   final TextEditingController _controller = TextEditingController();
   late Box<DataPoint> pointsBox;
-
   List<DataPoint> get points => pointsBox.values.toList();
 
   // Fitted line and confidence band
@@ -121,6 +121,60 @@ class _PlotScreenState extends State<PlotScreen> {
     return DateTime(date.year, date.month, date.day, time.hour, time.minute);
   }
 
+  void editPointDialog(DataPoint point, int index) {
+    final valueController =
+      TextEditingController(text: point.value.toString());
+
+    showDialog(
+        context: context,
+        builder: (_) {
+        return AlertDialog(
+            title: const Text("Edit Point"),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: valueController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(labelText: "Value"),
+                  ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  child: const Text("Change Timestamp"),
+                  onPressed: () async {
+                    final picked = await pickDateTime(context);
+                    if (picked != null) {
+                      point.timestamp = picked;
+                      await point.save();
+                      setState(() {});
+                    }
+                  },
+                  )
+              ],
+              ),
+              actions: [
+                TextButton(
+                    child: const Text("Cancel"),
+                    onPressed: () => Navigator.pop(context),
+                    ),
+              TextButton(
+                  child: const Text("Save"),
+                  onPressed: () async {
+                  final newVal = double.tryParse(valueController.text);
+                  if (newVal != null) {
+                  point.value = newVal;
+                  await point.save();
+                  setState(() {});
+                  }
+                  Navigator.pop(context);
+                  },
+                  ),
+              ],
+              );
+        },
+        );
+  }
+
   /// ------------------------------------------------------
   /// Compute fitted line and 95% confidence band using MCMC
   /// ------------------------------------------------------
@@ -133,39 +187,50 @@ class _PlotScreenState extends State<PlotScreen> {
     }
 
     final xs = points
-        .map((p) => p.timestamp.millisecondsSinceEpoch.toDouble())
+        .map((p) => p.timestamp.millisecondsSinceEpoch.toDouble() / 1000.0)
         .toList();
     final ys = points.map((p) => p.value).toList();
 
+    final minX = xs.reduce(math.min);
+    final maxX = xs.reduce(math.max);
+    final rangeX = maxX - minX;
+    final minY = ys.reduce(math.min);
+    final maxY = ys.reduce(math.max);
+    final rangeY = maxY - minY;
+
+    final x_norm = xs.map((x) => (x - minX) / rangeX).toList();
+    final y_norm = ys.map((y) => (y - minY) / rangeY).toList();
+
     // Initial fit using deterministic method
-    final initialFit = fitABC(xs, ys);
+    final initialFit = fitABC(x_norm, y_norm);
 
     // Run MCMC (stub function, replace with your own sampling)
-    final samples = runMCMC(xs, ys,
-        a0: initialFit.a, b0: initialFit.b, c0: initialFit.c, steps: 2000);
+    final samples = runMCMC(x_norm, y_norm,
+        a0: initialFit.a, b0: initialFit.b, c0: initialFit.c, d0: initialFit.d, steps: 50000);
 
     const int curvePoints = 150;
     medianLine = [];
     lowerBand = [];
     upperBand = [];
 
-    final minX = xs.reduce(math.min);
-    final maxX = xs.reduce(math.max);
-
     for (int i = 0; i < curvePoints; i++) {
-      final t = minX + (maxX - minX) * i / (curvePoints - 1);
+      //final t = minX + (maxX - minX) * i / (curvePoints - 1);
+      final tNorm = i / (curvePoints - 1);
 
       // compute y-values for each MCMC sample
-      List<double> ySamples = samples.map((s) => model(t, s.a, s.b, s.c)).toList()
+      List<double> ySamples = samples.map((s) => model(tNorm, s.a, s.b, s.c, s.d)).toList()
         ..sort();
+      //List<double> ySamples = samples.map((s) => model(tNorm, initialFit.a, initialFit.b, initialFit.c, initialFit.d)).toList()
+         //..sort();
 
       final lowerIndex = (ySamples.length * 0.025).floor();
       final upperIndex = (ySamples.length * 0.975).floor();
       final medianIndex = ySamples.length ~/ 2;
 
-      lowerBand.add(FlSpot(t, ySamples[lowerIndex]));
-      upperBand.add(FlSpot(t, ySamples[upperIndex]));
-      medianLine.add(FlSpot(t, ySamples[medianIndex]));
+      final t = minX + rangeX * tNorm;
+      lowerBand.add(FlSpot(t, minY + rangeY * ySamples[lowerIndex]));
+      upperBand.add(FlSpot(t, minY + rangeY * ySamples[upperIndex]));
+      medianLine.add(FlSpot(t, minY + rangeY * ySamples[medianIndex]));
     }
   }
 
@@ -173,7 +238,7 @@ class _PlotScreenState extends State<PlotScreen> {
     if (points.isEmpty) return [];
     final spots = points.map((p) {
       return FlSpot(
-        p.timestamp.millisecondsSinceEpoch.toDouble(),
+        p.timestamp.millisecondsSinceEpoch.toDouble() / 1000.0,
         p.value,
       );
     }).toList();
@@ -181,8 +246,8 @@ class _PlotScreenState extends State<PlotScreen> {
     return spots;
   }
 
-  String formatTimestamp(double ms) {
-    final dt = DateTime.fromMillisecondsSinceEpoch(ms.toInt());
+  String formatTimestamp(double s) {
+    final dt = DateTime.fromMillisecondsSinceEpoch(s.toInt() * 1000);
     return "${dt.hour}:${dt.minute.toString().padLeft(2, '0')}\n${dt.month}/${dt.day}";
   }
 
@@ -205,7 +270,9 @@ class _PlotScreenState extends State<PlotScreen> {
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              interval: (maxX - minX) / 4,
+              interval: (maxX - minX) == 0
+                 ? 1  // fallback interval
+                 : (maxX- minX) / 4,
               getTitlesWidget: (value, meta) {
                 return Padding(
                   padding: const EdgeInsets.only(top: 6),
@@ -328,6 +395,10 @@ class _PlotScreenState extends State<PlotScreen> {
                     child: ListTile(
                       title: Text("${point.value}"),
                       subtitle: Text(point.timestamp.toString()),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.edit),
+                        onPressed: () => editPointDialog(point, index),
+                      ),
                     ),
                   );
                 },
