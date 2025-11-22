@@ -9,7 +9,7 @@ class FitResult {
 
 // Model: a * (1 - exp((t - b)/c))
 double model(double t, double a, double b, double c) {
-  return a * (1 - math.exp((t - b) / c));
+  return a * (1 - math.exp(-(t - b) / c));
 }
 
 // Nonlinear least-squares fit using gradient descent
