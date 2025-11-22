@@ -311,6 +311,28 @@ class _PlotScreenState extends State<PlotScreen> {
                 child: buildChart(),
               ),
             ),
+            // List of points
+            Expanded(
+              child: ListView.builder(
+                itemCount: pointsBox.length,
+                itemBuilder: (context, index) {
+                  final point = pointsBox.getAt(index)!;
+
+                  return Dismissible(
+                    key: Key(point.key.toString()),
+                    background: Container(color: Colors.red),
+                    onDismissed: (_) {
+                      pointsBox.deleteAt(index);
+                      setState(() {});
+                    },
+                    child: ListTile(
+                      title: Text("${point.value}"),
+                      subtitle: Text(point.timestamp.toString()),
+                    ),
+                  );
+                },
+              ),
+            ),
           ],
         ),
       ),
