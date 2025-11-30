@@ -9,30 +9,46 @@ class StartScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Start")),
-      body: Column(
-        children: [
-          Spacer(flex:3),
-          ElevatedButton(
-          child: const Text("New data series"),
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const GraphPage()),
-            );
-          },
+      body: Center(
+        child: Column(
+          children: [
+            Spacer(flex: 3),
+            ElevatedButton(
+              child: const Text("New data series"),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const GraphPage()),
+                );
+              },
+            ),
+            Spacer(),
+            ElevatedButton(
+              child: const Text("Load data series"),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const DatasetSelectorPage(),
+                  ),
+                );
+              },
+            ),
+            Spacer(),
+            ElevatedButton(
+              child: const Text("About"),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const DatasetSelectorPage(),
+                  ),
+                );
+              },
+            ),
+            Spacer(flex: 3),
+          ],
         ),
-        Spacer(),
-        ElevatedButton(
-          child: const Text("Load data series"),
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const DatasetSelectorPage()),
-            );
-          }
-        ),
-        Spacer(flex: 3)
-        ]
       ),
     );
   }
