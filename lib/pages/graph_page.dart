@@ -1,3 +1,4 @@
+import 'package:advance_math/advance_math.dart';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'dart:math' as math;
@@ -206,7 +207,16 @@ class _GraphPageState extends State<GraphPage> {
 
   String formatTimestamp(double s) {
     final dt = DateTime.fromMillisecondsSinceEpoch(s.toInt() * 1000);
-    return "${dt.hour}:${dt.minute.toString().padLeft(2, '0')}\n${dt.day}/${dt.month}";
+    final now = DateTime.now();
+    if (dt.day == now.day && dt.month == now.month) {
+      return "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
+    }
+    return "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}\n${dt.day}/${dt.month}";
+  }
+
+  String formatTimestampWithSeconds(double s) {
+    final dt = DateTime.fromMillisecondsSinceEpoch(s.toInt() * 1000);
+    return "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}:${dt.second.toString().padLeft(2, '0')}";
   }
 
   Widget buildChart(BuildContext context) {
@@ -253,6 +263,31 @@ class _GraphPageState extends State<GraphPage> {
           maxX: maxX,
           minY: minY,
           maxY: maxY,
+          lineTouchData: LineTouchData(
+            touchTooltipData: LineTouchTooltipData(
+              tooltipPadding: const EdgeInsets.all(10),
+              getTooltipColor: (_) => colorScheme.surface,
+              getTooltipItems: (touchedSpots) {
+                List<LineTooltipItem?> rv = touchedSpots.map((e) {
+                  final textStyle = TextStyle(
+                    color:
+                        e.bar.gradient?.colors.first ??
+                        e.bar.color ??
+                        Colors.blueGrey,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  );
+                  return e.bar.color == Colors.transparent
+                      ? null
+                      : LineTooltipItem(
+                          't: ${formatTimestampWithSeconds(e.x)}\ny: ${e.y.toStringAsPrecision(4)}',
+                          textStyle,
+                        );
+                }).toList();
+                return rv;
+              },
+            ),
+          ),
           gridData: FlGridData(
             show: true,
             drawVerticalLine: true,
@@ -407,9 +442,9 @@ class _GraphPageState extends State<GraphPage> {
         highIntercept = formatTimestamp(controller.highIntercept!);
     }
 
-    // final theme = Theme.of(context);
-    // final colorScheme = theme.colorScheme;
-    // final textTheme = theme.textTheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
 
     return Scaffold(
       appBar: AppBar(
@@ -424,6 +459,7 @@ class _GraphPageState extends State<GraphPage> {
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
+          spacing: 10,
           children: [
             Row(
               children: [
@@ -484,15 +520,49 @@ class _GraphPageState extends State<GraphPage> {
             Row(
               children: [
                 Spacer(),
-                Text("median intercept: " + medIntercept),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 5,
+                    horizontal: 10,
+                  ),
+                  child: Column(
+                    children: [Text("optimistic"), Text(lowIntercept)],
+                  ),
+                ),
                 Spacer(),
-                Text("early estimate : " + lowIntercept),
+                Container(
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 5,
+                    horizontal: 10,
+                  ),
+                  child: Column(
+                    children: [Text("most probable"), Text(medIntercept)],
+                  ),
+                ),
                 Spacer(),
-                Text("late estimate : " + highIntercept),
+                Container(
+                  decoration: BoxDecoration(
+                    //color: colorScheme.surface,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 5,
+                    horizontal: 10,
+                  ),
+                  child: Column(
+                    children: [Text("conservative"), Text(highIntercept)],
+                  ),
+                ),
                 Spacer(),
               ],
             ),
-            const SizedBox(height: 20),
             Expanded(
               child: Container(
                 padding: const EdgeInsets.all(12),

@@ -37,13 +37,15 @@ class GraphController {
   }
 
   void addPoint(double value, {DateTime? timestamp}) {
-    _points.add(DataPoint(
-      value: value,
-      timestamp: timestamp == null ? DateTime.now() : timestamp,
-    ));
+    _points.add(
+      DataPoint(
+        value: value,
+        timestamp: timestamp == null ? DateTime.now() : timestamp,
+      ),
+    );
   }
 
-  void deletePoint(DataPoint point){
+  void deletePoint(DataPoint point) {
     _points.remove(point);
   }
 
@@ -66,16 +68,34 @@ class GraphController {
     final minY = ys.reduce(math.min);
     final maxY = ys.reduce(math.max);
     final rangeY = maxY - minY;
+    final meanY = (maxY + minY) / 2;
+    final meanX = (maxX + minX) / 2;
 
-    final x_norm = xs.map((x) => (x - minX) / rangeX).toList();
-    final y_norm = ys.map((y) => (y - minY) / rangeY).toList();
+    final x_norm = xs.map((x) => (x - meanX) / rangeX).toList();
+    final y_norm = ys.map((y) => (y - meanY) / rangeY).toList();
 
     // Initial fit using deterministic method
-    final initialFit = fitABC(x_norm, y_norm);
+    //final initialFit = fitABC(x_norm, y_norm);
 
-    // Run MCMC (stub function, replace with your own sampling)
-    final samples = runMCMC(x_norm, y_norm,
-        a0: initialFit.a, b0: initialFit.b, c0: initialFit.c, d0: initialFit.d, steps: 50000);
+    // Run MCMC
+    // final samples = runMCMC(x_norm, y_norm, a0: 0, b0: 1, c0: 0, steps: 50000);
+    final initialWalkers = List<List<double>>.generate(12, (i) {
+      final rnd = Rand(i + 123);
+      return [
+        0.0 + 0.2 * rnd.nextGaussian(), // a
+        1.0 + 0.5 * rnd.nextGaussian(), // b
+        0.0 + 1.0 * rnd.nextGaussian(), // c
+        math.max(0.005, 0.05 + 0.05 * rnd.nextGaussian()), // sigma
+      ];
+    });
+    final samples = ensembleSampler(
+      x_norm,
+      y_norm,
+      initialWalkers: initialWalkers,
+      steps: 8000,
+      thin: 5,
+      burnin: 1000,
+    );
 
     const int curvePoints = 100;
     _medianLine = [];
@@ -83,45 +103,46 @@ class GraphController {
     _upperBand = [];
 
     // Find the intercept with target (if target is not null...)
-    // y = a - b exp(c*(x-d)) => x = d + ln[-(y-a)/ b] / c iff -(y-a)/b > 0, otherwise, there is no solution.
+    // y = a - b^2/c (1-exp(c/b*x))) => x = ln[1+(y-a) * c / b^2] * b / c
     double targetIntercept(FitResult s) {
-        double a = rangeY * s.a + minY;
-        double b = rangeY * s.b;
-        double c = s.c / rangeX;
-        double d = rangeX * s.d + minX;
+      double t = (target! - meanY) / rangeY;
 
-        if ((target! >= a && b >= 0) || (target! <= a && b <= 0)) {
-            return - c.sign * double.infinity;
-        }
+      if ((1 + (t - s.a) * s.c / (s.b * s.b)) <= 0) {
+        return -(s.c / s.b).sign * double.infinity;
+      }
 
-        return d + math.log(-(target!-a)/b) / c;
+      double xInterceptNorm =
+          math.log(1 + (t - s.a) * s.c / (s.b * s.b)) * s.b / s.c;
+
+      return xInterceptNorm * rangeX + meanX;
     }
+
     double plotWindowMinX = minX - 0.1 * rangeX;
     double plotWindowMaxX = maxX + 0.1 * rangeX;
-    
+
     if (target != null) {
-        List<double> tIntercepts = samples.map(targetIntercept).toList()..sort();
-        final lowerIndex = (tIntercepts.length * 0.025).floor();
-        final upperIndex = (tIntercepts.length * 0.975).floor();
-        final medianIndex = tIntercepts.length ~/ 2;
-        
-        lowIntercept = tIntercepts[lowerIndex];
-        medIntercept = tIntercepts[medianIndex];
-        highIntercept = tIntercepts[upperIndex];
+      List<double> tIntercepts = samples.map(targetIntercept).toList()..sort();
+      final lowerIndex = (tIntercepts.length * 0.025).floor();
+      final upperIndex = (tIntercepts.length * 0.975).floor();
+      final medianIndex = tIntercepts.length ~/ 2;
 
-        plotWindowMinX = [
-            lowIntercept!, 
-            medIntercept!, 
-            highIntercept!, 
-            minX - 0.1*rangeX
-        ].where((v) => v != -double.infinity).reduce(math.min);
+      lowIntercept = tIntercepts[lowerIndex];
+      medIntercept = tIntercepts[medianIndex];
+      highIntercept = tIntercepts[upperIndex];
 
-        plotWindowMaxX = [
-            lowIntercept!, 
-            medIntercept!, 
-            highIntercept!, 
-            maxX + 0.1*rangeX
-        ].where((v) => v != double.infinity).reduce(math.max);
+      plotWindowMinX = [
+        lowIntercept!,
+        medIntercept!,
+        highIntercept!,
+        minX - 0.1 * rangeX,
+      ].where((v) => v != -double.infinity).reduce(math.min);
+
+      plotWindowMaxX = [
+        lowIntercept!,
+        medIntercept!,
+        highIntercept!,
+        maxX + 0.1 * rangeX,
+      ].where((v) => v != double.infinity).reduce(math.max);
     }
     print(lowIntercept);
     print(medIntercept);
@@ -132,22 +153,24 @@ class GraphController {
     print(plotWindowMaxX);
 
     for (int i = 0; i < curvePoints; i++) {
-      final t = plotWindowMinX + (plotWindowMaxX - plotWindowMinX) * i / (curvePoints - 1);
-      final tNorm = (t - minX) / rangeX;
+      final t =
+          plotWindowMinX +
+          (plotWindowMaxX - plotWindowMinX) * i / (curvePoints - 1);
+      final tNorm = (t - meanX) / rangeX;
 
       // compute y-values for each MCMC sample
-      List<double> ySamples = samples.map((s) => model(tNorm, s.a, s.b, s.c, s.d)).toList()
-        ..sort();
+      List<double> ySamples =
+          samples.map((s) => model(tNorm, s.a, s.b, s.c)).toList()..sort();
       //List<double> ySamples = samples.map((s) => model(tNorm, initialFit.a, initialFit.b, initialFit.c, initialFit.d)).toList()
-         //..sort();
+      //..sort();
 
       final lowerIndex = (ySamples.length * 0.025).floor();
       final upperIndex = (ySamples.length * 0.975).floor();
       final medianIndex = ySamples.length ~/ 2;
 
-      _lowerBand.add(FlSpot(t, minY + rangeY * ySamples[lowerIndex]));
-      _upperBand.add(FlSpot(t, minY + rangeY * ySamples[upperIndex]));
-      _medianLine.add(FlSpot(t, minY + rangeY * ySamples[medianIndex]));
+      _lowerBand.add(FlSpot(t, meanY + rangeY * ySamples[lowerIndex]));
+      _upperBand.add(FlSpot(t, meanY + rangeY * ySamples[upperIndex]));
+      _medianLine.add(FlSpot(t, meanY + rangeY * ySamples[medianIndex]));
     }
   }
 
