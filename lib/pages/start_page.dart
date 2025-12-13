@@ -8,8 +8,11 @@ class StartScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
     return Scaffold(
-      appBar: AppBar(title: const Text("Start")),
+      //appBar: AppBar(title: const Text("Start")),
       body: Center(
         child: Column(
           children: [
@@ -22,6 +25,13 @@ class StartScreen extends StatelessWidget {
                 width: 200,
                 height: 200,
                 fit: BoxFit.cover,
+              ),
+            ),
+            Spacer(),
+            Text(
+              "Predikt",
+              style: textTheme.displayLarge?.copyWith(
+                color: colorScheme.secondary,
               ),
             ),
             Spacer(),

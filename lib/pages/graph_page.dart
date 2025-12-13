@@ -52,14 +52,17 @@ class _GraphPageState extends State<GraphPage> {
   }
 
   void _setTarget() async {
-    setState(() => _updatingFit = true);
     //setState(() {});
     final text = targetController.text.trim();
-    if (text.isEmpty) return;
-    final number = double.tryParse(text);
-    if (number == null) return;
-    controller.target = number;
+    if (text.isEmpty) {
+      controller.target = null;
+    } else {
+      final number = double.tryParse(text);
+      if (number == null) return;
+      controller.target = number;
+    }
     // targetController.clear();
+    setState(() => _updatingFit = true);
     controller.saveCurrentDataset();
     await controller.updateFit();
     setState(() => _updatingFit = false);

@@ -1,5 +1,5 @@
 import 'dart:math' as math;
-import 'package:predictor/logic/data.dart';
+import 'package:predikt/logic/data.dart';
 
 class FitResult {
   final List<double> x;
