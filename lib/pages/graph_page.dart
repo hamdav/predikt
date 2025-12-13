@@ -1,9 +1,9 @@
-import 'package:advance_math/advance_math.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'dart:math' as math;
 import '../logic/graph_controller.dart';
-import '../logic/data_point.dart';
+import '../logic/data.dart';
 
 class GraphPage extends StatefulWidget {
   final String? datasetName;
@@ -19,6 +19,7 @@ class _GraphPageState extends State<GraphPage> {
   final TextEditingController valueController = TextEditingController();
   final TextEditingController targetController = TextEditingController();
   final TextEditingController datasetNameController = TextEditingController();
+  bool _updatingFit = false;
 
   @override
   void initState() {
@@ -27,6 +28,7 @@ class _GraphPageState extends State<GraphPage> {
   }
 
   Future<void> _init() async {
+    setState(() => _updatingFit = true);
     if (widget.datasetName == null) {
       // Automatically create a brand-new dataset
       // final newName = _generateDatasetName();
@@ -36,10 +38,12 @@ class _GraphPageState extends State<GraphPage> {
     } else {
       // Load existing dataset
       await controller.loadDataset(widget.datasetName!);
+      if (controller.target != null) {
+        targetController.text = controller.target!.toString();
+      }
     }
-    setState(() {
-      controller.updateFit();
-    });
+    await controller.updateFit();
+    setState(() => _updatingFit = false);
   }
 
   String _generateDatasetName() {
@@ -47,19 +51,39 @@ class _GraphPageState extends State<GraphPage> {
     return 'Dataset_${now.year}-${now.month}-${now.day}_${now.hour}-${now.minute}-${now.second}';
   }
 
-  void _setTarget() {
+  void _setTarget() async {
+    setState(() => _updatingFit = true);
+    //setState(() {});
     final text = targetController.text.trim();
     if (text.isEmpty) return;
     final number = double.tryParse(text);
     if (number == null) return;
     controller.target = number;
     // targetController.clear();
-    setState(() {
-      controller.updateFit();
-    });
+    controller.saveCurrentDataset();
+    await controller.updateFit();
+    setState(() => _updatingFit = false);
   }
 
-  void _addValueNow() {
+  String get fitFuncText =>
+      controller.fitFunc == FitFunction.exponential ? 'exp' : 'lin';
+
+  void _toggleFitFunc() async {
+    setState(() => _updatingFit = true);
+    switch (controller.fitFunc) {
+      case FitFunction.exponential:
+        controller.fitFunc = FitFunction.linear;
+      case FitFunction.linear:
+        controller.fitFunc = FitFunction.exponential;
+    }
+    controller.saveCurrentDataset();
+    await controller.updateFit();
+
+    setState(() => _updatingFit = false);
+  }
+
+  void _addValueNow() async {
+    setState(() => _updatingFit = true);
     final text = valueController.text.trim();
     if (text.isEmpty) return;
     final number = double.tryParse(text);
@@ -67,10 +91,9 @@ class _GraphPageState extends State<GraphPage> {
 
     controller.addPoint(number);
     valueController.clear();
-    setState(() {
-      controller.updateFit();
-      controller.saveCurrentDataset();
-    });
+    controller.saveCurrentDataset();
+    await controller.updateFit();
+    setState(() => _updatingFit = false);
   }
 
   void _addValueWithPicker() async {
@@ -82,12 +105,12 @@ class _GraphPageState extends State<GraphPage> {
     final number = double.tryParse(text);
     if (number == null) return;
 
+    setState(() => _updatingFit = true);
     controller.addPoint(number, timestamp: picked);
     valueController.clear();
-    setState(() {
-      controller.updateFit();
-      controller.saveCurrentDataset();
-    });
+    controller.saveCurrentDataset();
+    await controller.updateFit();
+    setState(() => _updatingFit = false);
   }
 
   void _saveDatasetAs() {
@@ -115,7 +138,7 @@ class _GraphPageState extends State<GraphPage> {
               child: const Text("Save"),
               onPressed: () async {
                 final newName = datasetNameController.text;
-                if (newName != null && newName != "") {
+                if (newName != "") {
                   controller.currentDatasetName = newName;
                   controller.saveCurrentDataset();
                 }
@@ -146,6 +169,7 @@ class _GraphPageState extends State<GraphPage> {
 
   void editPointDialog(DataPoint point, int index) {
     final valueController = TextEditingController(text: point.value.toString());
+    final oldPoint = DataPoint(timestamp: point.timestamp, value: point.value);
 
     showDialog(
       context: context,
@@ -170,10 +194,10 @@ class _GraphPageState extends State<GraphPage> {
                   if (picked != null) {
                     point.timestamp = picked;
                     // await point.save();
-                    setState(() {
-                      controller.updateFit();
-                      controller.saveCurrentDataset();
-                    });
+                    //controller.saveCurrentDataset();
+                    //await controller.updateFit();
+                    //setState(() {});
+                    //Navigator.pop(context);
                   }
                 },
               ),
@@ -182,21 +206,24 @@ class _GraphPageState extends State<GraphPage> {
           actions: [
             TextButton(
               child: const Text("Cancel"),
-              onPressed: () => Navigator.pop(context),
+              onPressed: () {
+                point.timestamp = oldPoint.timestamp;
+                Navigator.pop(context);
+              },
             ),
             TextButton(
               child: const Text("Save"),
               onPressed: () async {
                 final newVal = double.tryParse(valueController.text);
                 if (newVal != null) {
+                  setState(() => _updatingFit = true);
                   point.value = newVal;
+                  Navigator.pop(context);
                   // await point.save();
-                  setState(() {
-                    controller.updateFit();
-                    controller.saveCurrentDataset();
-                  });
+                  controller.saveCurrentDataset();
+                  await controller.updateFit();
+                  setState(() => _updatingFit = false);
                 }
-                Navigator.pop(context);
               },
             ),
           ],
@@ -266,7 +293,9 @@ class _GraphPageState extends State<GraphPage> {
           lineTouchData: LineTouchData(
             touchTooltipData: LineTouchTooltipData(
               tooltipPadding: const EdgeInsets.all(10),
-              getTooltipColor: (_) => colorScheme.surface,
+              fitInsideHorizontally: true,
+              fitInsideVertically: true,
+              getTooltipColor: (_) => colorScheme.surface.withAlpha(200),
               getTooltipItems: (touchedSpots) {
                 List<LineTooltipItem?> rv = touchedSpots.map((e) {
                   final textStyle = TextStyle(
@@ -426,25 +455,31 @@ class _GraphPageState extends State<GraphPage> {
         lowIntercept = "infinity";
       else if (controller.lowIntercept == -double.infinity)
         lowIntercept = "-infinity";
+      else if (controller.lowIntercept == null)
+        lowIntercept = "Not enough data";
       else
         lowIntercept = formatTimestamp(controller.lowIntercept!);
       if (controller.medIntercept == double.infinity)
         medIntercept = "infinity";
       else if (controller.medIntercept == -double.infinity)
         medIntercept = "-infinity";
+      else if (controller.medIntercept == null)
+        medIntercept = "Not enough data";
       else
         medIntercept = formatTimestamp(controller.medIntercept!);
       if (controller.highIntercept == double.infinity)
         highIntercept = "infinity";
       else if (controller.highIntercept == -double.infinity)
         highIntercept = "-infinity";
+      else if (controller.highIntercept == null)
+        highIntercept = "Not enough data";
       else
         highIntercept = formatTimestamp(controller.highIntercept!);
     }
 
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final textTheme = theme.textTheme;
+    // final textTheme = theme.textTheme;
 
     return Scaffold(
       appBar: AppBar(
@@ -478,26 +513,21 @@ class _GraphPageState extends State<GraphPage> {
                 const SizedBox(width: 10),
                 GestureDetector(
                   //onTap: _addValueNow,
-                  onLongPress: _addValueWithPicker,
+                  onLongPress: _updatingFit ? null : _addValueWithPicker,
                   child: ElevatedButton(
-                    onPressed: _addValueNow,
+                    onPressed: _updatingFit ? null : _addValueNow,
                     child: const Text("Add"),
-                    // style: ElevatedButton.styleFrom(
-                    //   foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                    //   backgroundColor: Theme.of(context).colorScheme.primary,
-                    //   disabledForegroundColor: Theme.of(
-                    //     context,
-                    //   ).colorScheme.onPrimary,
-                    //   disabledBackgroundColor: Theme.of(
-                    //     context,
-                    //   ).colorScheme.primary,
-                    // ),
                   ),
                 ),
               ],
             ),
             Row(
               children: [
+                ElevatedButton(
+                  onPressed: _updatingFit ? null : _toggleFitFunc,
+                  child: Text(fitFuncText),
+                ),
+                const SizedBox(width: 10),
                 Expanded(
                   child: TextField(
                     controller: targetController,
@@ -512,7 +542,7 @@ class _GraphPageState extends State<GraphPage> {
                 ),
                 const SizedBox(width: 10),
                 ElevatedButton(
-                  onPressed: _setTarget,
+                  onPressed: _updatingFit ? null : _setTarget,
                   child: const Text("Set target"),
                 ),
               ],
@@ -578,7 +608,7 @@ class _GraphPageState extends State<GraphPage> {
               child: ListView.builder(
                 itemCount: controller.points.length,
                 itemBuilder: (context, index) {
-                  final point = controller.points[index]!;
+                  final point = controller.points[index];
 
                   return Dismissible(
                     key: Key(
@@ -587,8 +617,8 @@ class _GraphPageState extends State<GraphPage> {
                               .toDouble()
                               .toString(),
                     ),
-                    background: Container(color: Colors.red),
-                    onDismissed: (_) {
+                    background: Container(color: colorScheme.secondary),
+                    onDismissed: (_) async {
                       // Remove the item from the data source immediately
                       final removedPoint = point;
 
@@ -596,6 +626,8 @@ class _GraphPageState extends State<GraphPage> {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text("Deleted ${removedPoint.value}"),
+                          duration: Duration(seconds: 10),
+                          persist: false,
                           action: SnackBarAction(
                             label: "Undo",
                             onPressed: () {
@@ -611,14 +643,10 @@ class _GraphPageState extends State<GraphPage> {
                           ),
                         ),
                       );
-                      setState(() {
-                        controller.deletePoint(point);
-                        controller.updateFit();
-                        controller.saveCurrentDataset();
-                      });
-                      // WidgetsBinding.instance.addPostFrameCallback((_) { // Delay rebuild...
-                      //   setState(() {});
-                      // });
+                      controller.deletePoint(point);
+                      controller.saveCurrentDataset();
+                      await controller.updateFit();
+                      setState(() {});
                     },
                     child: ListTile(
                       title: Text("${point.value}"),

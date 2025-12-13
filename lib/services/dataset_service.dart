@@ -1,5 +1,5 @@
 import 'package:hive/hive.dart';
-import '../logic/data_point.dart';
+import '../logic/data.dart';
 
 class DatasetService {
   static const boxName = 'datasets';
@@ -9,16 +9,17 @@ class DatasetService {
   }
 
   /// Save list of DataPoints under a dataset name
-  Future<void> saveDataset(String name, List<DataPoint> points) async {
+  Future<void> saveDataset(String name, DataSet dataSet) async {
     final box = await _open();
-    await box.put(name, points);
+    await box.put(name, dataSet);
   }
 
   /// Load DataPoints of a dataset
-  Future<List<DataPoint>> loadDataset(String name) async {
+  Future<DataSet> loadDataset(String name) async {
     final box = await _open();
-    final data = box.get(name);
-    return data != null ? List<DataPoint>.from(data) : [];
+    DataSet? data = box.get(name);
+    return data ??
+        DataSet(fitFunc: FitFunction.exponential, points: [], target: null);
   }
 
   /// List all dataset names

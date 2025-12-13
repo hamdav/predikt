@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/dataset_service.dart';
 import 'graph_page.dart';
+import '../logic/data.dart';
 
 class DatasetSelectorPage extends StatefulWidget {
   const DatasetSelectorPage({super.key});
@@ -32,9 +33,7 @@ class _DatasetSelectorPageState extends State<DatasetSelectorPage> {
         title: const Text('Create new dataset'),
         content: TextField(
           controller: controller,
-          decoration: const InputDecoration(
-            labelText: 'Dataset name',
-          ),
+          decoration: const InputDecoration(labelText: 'Dataset name'),
         ),
         actions: [
           TextButton(
@@ -43,7 +42,7 @@ class _DatasetSelectorPageState extends State<DatasetSelectorPage> {
               _createDataset(controller.text.trim());
             },
             child: const Text('Create'),
-          )
+          ),
         ],
       ),
     );
@@ -51,7 +50,10 @@ class _DatasetSelectorPageState extends State<DatasetSelectorPage> {
 
   Future<void> _createDataset(String name) async {
     if (name.isEmpty) return;
-    await service.saveDataset(name, []);
+    await service.saveDataset(
+      name,
+      DataSet(fitFunc: FitFunction.exponential, points: [], target: null),
+    );
     _load();
   }
 
@@ -72,7 +74,9 @@ class _DatasetSelectorPageState extends State<DatasetSelectorPage> {
             background: Container(color: Colors.red),
             onDismissed: (_) {
               service.deleteDataset(name);
-              setState((){_load();});
+              setState(() {
+                _load();
+              });
             },
             child: ListTile(
               title: Text(name),
@@ -83,8 +87,8 @@ class _DatasetSelectorPageState extends State<DatasetSelectorPage> {
                     builder: (_) => GraphPage(datasetName: name),
                   ),
                 );
-            },
-          )
+              },
+            ),
           );
         },
       ),

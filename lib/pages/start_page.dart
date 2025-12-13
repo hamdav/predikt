@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'graph_page.dart';
 import 'dataset_selection_page.dart';
+import 'about_page.dart';
 
 class StartScreen extends StatelessWidget {
   const StartScreen({super.key});
@@ -12,7 +13,18 @@ class StartScreen extends StatelessWidget {
       body: Center(
         child: Column(
           children: [
-            Spacer(flex: 3),
+            Spacer(flex: 2),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+
+              child: Image.asset(
+                'assets/images/start_page_icon.png',
+                width: 200,
+                height: 200,
+                fit: BoxFit.cover,
+              ),
+            ),
+            Spacer(),
             ElevatedButton(
               child: const Text("New data series"),
               onPressed: () {
@@ -40,9 +52,7 @@ class StartScreen extends StatelessWidget {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => const DatasetSelectorPage(),
-                  ),
+                  MaterialPageRoute(builder: (_) => const AboutPage()),
                 );
               },
             ),
