@@ -86,12 +86,12 @@ class _GraphPageState extends State<GraphPage> {
   }
 
   void _addValueNow() async {
-    setState(() => _updatingFit = true);
     final text = valueController.text.trim();
     if (text.isEmpty) return;
     final number = double.tryParse(text);
     if (number == null) return;
 
+    setState(() => _updatingFit = true);
     controller.addPoint(number);
     valueController.clear();
     controller.saveCurrentDataset();
@@ -507,6 +507,7 @@ class _GraphPageState extends State<GraphPage> {
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
+                    onSubmitted: _updatingFit ? null : (_) => _addValueNow(),
                     decoration: const InputDecoration(
                       labelText: "Enter a number",
                       border: OutlineInputBorder(),
@@ -653,7 +654,10 @@ class _GraphPageState extends State<GraphPage> {
                     },
                     child: ListTile(
                       title: Text("${point.value}"),
-                      subtitle: Text(point.timestamp.toString()),
+                      //subtitle: Text(point.timestamp.toString()),
+                      subtitle: Text(
+                        "${point.timestamp.year}-${point.timestamp.month.toString().padLeft(2, '0')}-${point.timestamp.day.toString().padLeft(2, '0')} ${point.timestamp.hour.toString().padLeft(2, '0')}:${point.timestamp.minute.toString().padLeft(2, '0')}:${point.timestamp.second.toString().padLeft(2, '0')}",
+                      ),
                       trailing: IconButton(
                         icon: const Icon(Icons.edit),
                         onPressed: () => editPointDialog(point, index),

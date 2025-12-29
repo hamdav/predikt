@@ -42,7 +42,7 @@ double expLogLikelihood(List<double> ts, List<double> ys, List<double> x) {
       s * s / 0.01 -
       a * a / 1000 -
       b * b / 1000 -
-      c * c / 1000;
+      c * c / 10000;
   return sum + prior;
 }
 
