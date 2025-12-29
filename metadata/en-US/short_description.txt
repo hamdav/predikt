@@ -1,0 +1,4 @@
+Prediktor is a simple app for your everyday prediction needs.
+It's designed to be simple and easy to use when you want a quick estimate for when something will finish.
+While before you thought that "A watched pot never boils",
+with predictor, the watched pot will boil between 11:37 and 11:42.
