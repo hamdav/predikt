@@ -1,4 +1,4 @@
-package com.example.predictor
+package io.github.hamdav.predikt
 
 import io.flutter.embedding.android.FlutterActivity
 
