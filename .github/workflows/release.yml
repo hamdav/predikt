@@ -1,0 +1,32 @@
+
+name: Flutter Release
+
+on:
+  push:
+    tags:
+      - 'v*'   # Runs when you push a tag like v0.2.3
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout source
+      - uses: actions/checkout@v3
+
+      # 2. Install Flutter (pin version here)
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.5'   # <-- Your Flutter version
+
+      # 3. Get dependencies
+      - run: flutter pub get
+
+      # 4. Build release APK
+      - run: flutter build apk --release --tree-shake-icons
+
+      # 5. Upload APK as artifact
+      - uses: actions/upload-artifact@v3
+        with:
+          name: app-release
+          path: build/app/outputs/flutter-apk/app-release.apk
