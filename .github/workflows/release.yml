@@ -17,7 +17,7 @@ jobs:
       # 2. Install Flutter (pin version here)
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.38.5'   # <-- Your Flutter version
+          flutter-version: '3.38.5'
 
       # 3. Get dependencies
       - run: flutter pub get
