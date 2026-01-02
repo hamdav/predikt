@@ -1,9 +1,85 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'dart:math' as math;
 import '../logic/graph_controller.dart';
 import '../logic/data.dart';
+
+class FullScreenGraphPage extends StatefulWidget {
+  const FullScreenGraphPage({super.key, required this.buildChart});
+
+  /// Reuse the same chart builder from GraphPage to ensure identical rendering
+  final Widget Function(BuildContext context) buildChart;
+
+  @override
+  State<FullScreenGraphPage> createState() => _FullScreenGraphPageState();
+}
+
+class _FullScreenGraphPageState extends State<FullScreenGraphPage> {
+  @override
+  void initState() {
+    super.initState();
+
+    // (Optional) capture current orientations if you need to restore exactly;
+    // not strictly necessary—restoring to `preferred`/`portraitUp` is common.
+
+    // Force landscape only
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+
+    // Hide system UI for true full screen
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  }
+
+  @override
+  void dispose() {
+    // Restore portrait (or your app default). If your app supports more, set them here.
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown, // include if your app allows it
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+
+    // Restore normal system UI
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      body: SafeArea(
+        // If the chart itself is responsive, it will expand nicely in landscape.
+        child: Stack(
+          children: [
+            // Centered, full-size chart
+            Positioned.fill(
+              child: Padding(
+                // Small padding so axes labels don’t collide with bezels
+                padding: const EdgeInsets.all(12),
+                child: widget.buildChart(context),
+              ),
+            ),
+            // A simple close button
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton(
+                icon: const Icon(Icons.close),
+                color: Theme.of(context).colorScheme.onSurface,
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class GraphPage extends StatefulWidget {
   final String? datasetName;
@@ -44,11 +120,6 @@ class _GraphPageState extends State<GraphPage> {
     }
     await controller.updateFit();
     setState(() => _updatingFit = false);
-  }
-
-  String _generateDatasetName() {
-    final now = DateTime.now();
-    return 'Dataset_${now.year}-${now.month}-${now.day}_${now.hour}-${now.minute}-${now.second}';
   }
 
   void _setTarget() async {
@@ -144,6 +215,7 @@ class _GraphPageState extends State<GraphPage> {
                 if (newName != "") {
                   controller.currentDatasetName = newName;
                   controller.saveCurrentDataset();
+                  setState(() {});
                 }
                 Navigator.pop(context);
               },
@@ -450,16 +522,16 @@ class _GraphPageState extends State<GraphPage> {
 
   @override
   Widget build(BuildContext context) {
-    String lowIntercept = "no target";
-    String medIntercept = "no target";
-    String highIntercept = "no target";
+    String lowIntercept = "-";
+    String medIntercept = "-";
+    String highIntercept = "-";
     if (controller.target != null) {
       if (controller.lowIntercept == double.infinity)
         lowIntercept = "infinity";
       else if (controller.lowIntercept == -double.infinity)
         lowIntercept = "-infinity";
       else if (controller.lowIntercept == null)
-        lowIntercept = "Not enough data";
+        lowIntercept = "-";
       else
         lowIntercept = formatTimestamp(controller.lowIntercept!);
       if (controller.medIntercept == double.infinity)
@@ -467,7 +539,7 @@ class _GraphPageState extends State<GraphPage> {
       else if (controller.medIntercept == -double.infinity)
         medIntercept = "-infinity";
       else if (controller.medIntercept == null)
-        medIntercept = "Not enough data";
+        medIntercept = "-";
       else
         medIntercept = formatTimestamp(controller.medIntercept!);
       if (controller.highIntercept == double.infinity)
@@ -475,7 +547,7 @@ class _GraphPageState extends State<GraphPage> {
       else if (controller.highIntercept == -double.infinity)
         highIntercept = "-infinity";
       else if (controller.highIntercept == null)
-        highIntercept = "Not enough data";
+        highIntercept = "-";
       else
         highIntercept = formatTimestamp(controller.highIntercept!);
     }
@@ -598,13 +670,27 @@ class _GraphPageState extends State<GraphPage> {
               ],
             ),
             Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  //color: colorScheme.surface,
-                  borderRadius: BorderRadius.circular(12),
+              child: GestureDetector(
+                onDoubleTap: () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => FullScreenGraphPage(
+                        buildChart:
+                            buildChart, // pass builder so it renders same chart
+                      ),
+                    ),
+                  );
+                  // No need to do anything here; the full-screen page will restore orientation/UI on pop.
+                },
+
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    //color: colorScheme.surface,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: buildChart(context),
                 ),
-                child: buildChart(context),
               ),
             ),
             // List of points

@@ -98,7 +98,7 @@ class GraphController {
 
     final minX = xs.reduce(math.min);
     final maxX = xs.reduce(math.max);
-    final medX = xs[xs.length ~/ 2];
+    // final medX = xs[xs.length ~/ 2];
     final meanX = xs.reduce((a, b) => a + b) / xs.length;
 
     double rangeX = maxX - minX;
@@ -115,7 +115,7 @@ class GraphController {
     rangeX = stdX;
     final minY = ys.reduce(math.min);
     final maxY = ys.reduce(math.max);
-    final medY = ys[ys.length ~/ 2];
+    // final medY = ys[ys.length ~/ 2];
     final meanY = ys.reduce((a, b) => a + b) / ys.length;
     double rangeY = maxY - minY;
     if (rangeY == 0) {
