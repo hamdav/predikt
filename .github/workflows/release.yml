@@ -23,7 +23,7 @@ jobs:
       - run: flutter pub get
 
       # 4. Build release APK
-      - run: flutter build apk --release --tree-shake-icons
+      - run: flutter build apk --debug --tree-shake-icons
 
       # 5. Upload APK as artifact
       - uses: actions/upload-artifact@v4
